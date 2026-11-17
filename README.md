@@ -1,103 +1,54 @@
-# 🧠 Single-Cycle RV32I Processor
+# Single-Cycle RV32I Processor
 
-This project implements a **32-bit single-cycle RISC-V (RV32I) processor** using Verilog HDL. The design follows the Harvard architecture and executes **one instruction per clock cycle**.
+A 32-bit CPU written in Verilog for the IEEE Digital Design Workshop (2024–2025). The core executes one instruction per clock cycle and uses separate instruction ROM and data RAM. It implements 18 RV32I instructions and is simulated in QuestaSim.
 
-Built during the Digital Design Workshop (2024/2025), this project helped me understand the core concepts of processor design, datapath integration, and hardware simulation.
+In November 2026, Ali Sabet revisited this team project, corrected several datapath and control edge cases, and added a reproducible QuestaSim test and waveform for the original Fibonacci program.
 
----
+## Architecture
 
-## 🏗️ Features
+The program counter addresses the instruction ROM. The control unit decodes the instruction and selects the ALU operands and writeback source. The ALU performs arithmetic and logic, computes load and store addresses, and supplies flags for branch decisions. Each cycle ends with the next PC and any enabled register or RAM write.
 
-- Harvard Architecture (separate instruction/data memory)
-- Fully modular Verilog design
-- Supports basic RISC-V instructions (ADD, SUB, LW, SW, BEQ, etc.)
-- ALU with support for: ADD, SUB, AND, OR, XOR, SHL, SHR
-- Simulation with Fibonacci sequence in ModelSim
+- **Register file** — 32 registers with two read ports and one write port. Writes to `x0` are discarded.
+- **Instruction memory** — 64 words initialized from [the Fibonacci program](programs/program.txt).
+- **Data memory** — 64 words with combinational reads and clocked writes.
 
----
+## Supported instructions
 
-## 📁 Project Structure
+| Group | Instructions |
+| --- | --- |
+| Register arithmetic and logic | `ADD`, `SUB`, `AND`, `OR`, `XOR`, `SLL`, `SRL` |
+| Immediate arithmetic and logic | `ADDI`, `ANDI`, `ORI`, `XORI`, `SLLI`, `SRLI` |
+| Memory | `LW`, `SW` |
+| Branch | `BEQ`, `BNE`, `BLT` |
 
-```
-/rtl         → All Verilog modules
-/programs    → Machine code (fibonacci)
-/docs        → Report & diagrams
-```
+Programs must use this exact subset. An assembler configured for RV32I may emit other instructions. Instruction fetches and word accesses use four-byte-aligned byte addresses from 0 through 252 in their respective memories. An invalid load leaves its destination register unchanged. An invalid store leaves RAM unchanged. A misaligned branch target causes the PC to advance by four.
 
----
+## Repository layout
 
-## 💡 Modules
+| Path | Contents |
+| --- | --- |
+| [rtl/](rtl/) | `TopModule.v` connects the controller, ALU, register file, memories, immediate extender, and PC logic. |
+| [programs/program.txt](programs/program.txt) | Fibonacci program as hexadecimal machine words. |
+| [tb/cpu_tb.sv](tb/cpu_tb.sv) | Self-checking Fibonacci smoke test. |
+| [do-file/run.do](do-file/run.do) | Questa compile and simulation commands. |
 
-## 💡 Modules
+## Run the simulation
 
-- `ALU.v` – Arithmetic and logic operations (ADD, SUB, AND, OR, XOR, SHL, SHR)
-- `ControlUnit.v` – Main control logic and ALU decoder based on instruction fields
-- `data_mem.v` – Data memory (64-entry RAM), supports lw/sw
-- `instruction_mem.v` – Instruction memory (ROM), loads program from file
-- `MUX.v` – Reusable 2x1 multiplexer used for PCSrc, ALUSrc, ResultSrc
-- `PC_reg.v` – Program counter register with reset and load control
-- `PCNext_logic.v` – Calculates next PC based on PC+4 or branch target
-- `register_file.v` – 32x32-bit register file with dual-read and single-write
-- `SignExtender.v` – Extracts and sign-extends immediates (I, S, B types)
-- `TopModule.v` – Integrates all components into one single-cycle datapath
+Open QuestaSim with the repository root as its working directory and enter:
 
----
-
-## 🧪 Simulation
-
-Tested on a **Fibonacci program**, demonstrating:
-- Arithmetic calculations
-- Conditional branching
-- Memory write
-
-### 📝 Sample C code:
-```c
-int x = 0, y = 1;
-for (int i = 0; i < 10; i++) {
-  if (sel == 1) { x = x + y; sel = 2; }
-  else         { y = x + y; sel = 1; }
-}
+```tcl
+do do-file/run.do
 ```
 
-### 🧾 Sample machine code:
-```
-00004033
-00000093
-00100113
-00100193
-00100213
-00000293
-00a00313
-00000393
-00418c63
-00110133
-404181b3
-00229393
-0023a023
-00420a63
-002080b3
-004181b3
-00229393
-0013a023
-00128293
-fc62cae3
-00000000
+The testbench resets the core and runs the Fibonacci program from ROM. It checks that the PC reaches byte address `0x50`, that registers `x1` and `x2` contain `55` and `89`, and that the same values appear at RAM byte addresses `0x20` and `0x24`. A successful run prints `PASS: Fibonacci program`.
 
-```
+## Waveform
 
----
+The Questa waveform shows the ten Fibonacci values appearing in RAM words 0 through 9. Red traces indicate unknown RAM contents before the first write.
 
-## 📸 Waveform
+![Questa waveform showing the Fibonacci sequence stored in RAM](docs/fibonacci-waveform.png)
 
-<img width="1600" height="971" alt="image" src="https://github.com/user-attachments/assets/9ebae06b-0769-4458-b8f3-97e26de06e6c" />
+## Authors
 
-
----
-
-## 🙋‍♂ Authors
-
-Ali Mohamed  
-GitHub: [@Ali_Said](https://github.com/Ali-M-Said)
-
-Abdelrahman Mohamed Misbah  
-GitHub: [@Abdelrahman-Misbah](https://github.com/Abdelrahman-Misbah)
+- Ali Mohamed
+- Abdelrahman Mohamed Misbah ([GitHub](https://github.com/Abdelrahman-Misbah))

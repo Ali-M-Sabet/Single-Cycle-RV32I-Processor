@@ -8,20 +8,22 @@ module ALU #(
     output wire signflag
 );
 
+    localparam SHIFT_BITS = (WIDTH < 5) ? WIDTH : 5;
+
     always @(*) begin
         case (ALUControl)
-            3'b000: ALUResult = SrcA + SrcB;          // A + B
-            3'b001: ALUResult = SrcA << SrcB;         // A SHL B
-            3'b010: ALUResult = SrcA - SrcB;          // A - B
-            3'b100: ALUResult = SrcA ^ SrcB;          // A XOR B
-            3'b101: ALUResult = SrcA >> SrcB;         // A SHR B
-            3'b110: ALUResult = SrcA | SrcB;          // A OR B
-            3'b111: ALUResult = SrcA & SrcB;          // A AND B
-            default: ALUResult = 0;                   // default to 0
+            3'b000: ALUResult = SrcA + SrcB;
+            3'b001: ALUResult = SrcA << SrcB[SHIFT_BITS-1:0];
+            3'b010: ALUResult = SrcA - SrcB;
+            3'b100: ALUResult = SrcA ^ SrcB;
+            3'b101: ALUResult = SrcA >> SrcB[SHIFT_BITS-1:0];
+            3'b110: ALUResult = SrcA | SrcB;
+            3'b111: ALUResult = SrcA & SrcB;
+            default: ALUResult = 0;
         endcase
     end
 
-    assign zero = (ALUResult == 0);                   // Zero flag
-    assign signflag = ALUResult[WIDTH-1];             // Sign flag (MSB)
+    assign zero = (ALUResult == 0);
+    assign signflag = ALUResult[WIDTH-1];
 
 endmodule

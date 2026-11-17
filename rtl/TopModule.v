@@ -1,6 +1,6 @@
 module TopModule (
     input clk,
-    input reset
+    input reset // active low
 );
     wire [31:0] PC, PCNext, Instr;
     wire [31:0] ImmExt;
@@ -9,29 +9,34 @@ module TopModule (
     wire [31:0] RD2, ReadData, Result;
 
     wire zero, signflag;
+    // Opposite operand signs determine signed less-than without subtraction overflow.
+    wire signed_less = (SrcA[31] ^ SrcB[31]) ? SrcA[31] : signflag;
     wire [2:0] ALUControl;
     wire [1:0] ImmSrc;
     wire ResultSrc, MemWrite, ALUSrc, RegWrite, PCSrc;
 
-    // PC Register
+    // The 64-word RAM accepts aligned byte addresses from 0 to 252.
+    wire valid_data_address = ALUResult[31:8] == 0 && ALUResult[1:0] == 0;
+    wire register_write = RegWrite && (!ResultSrc || valid_data_address);
+    wire memory_write = MemWrite && reset && valid_data_address;
+    wire take_branch = PCSrc && (ImmExt[1:0] == 0);
+
     PC_reg pc_reg (
         .PCNext(PCNext),
         .CLK(clk),
         .areset(reset),
-        .load(1'b1),     // always load unless halted (not supported yet)
+        .load(1'b1),
         .PC(PC)
     );
 
-    // Instruction Memory (word-aligned)
     instruction_memory instr_mem (
         .PC(PC),
         .instr(Instr)
     );
 
-    // Control Unit
     ControlUnit control_unit (
         .zero(zero),
-        .signflag(signflag),
+        .signflag(signed_less),
         .op(Instr[6:0]),
         .funct3(Instr[14:12]),
         .funct7(Instr[30]),
@@ -44,11 +49,10 @@ module TopModule (
         .PCSrc(PCSrc)
     );
 
-    // Register File
     register_file reg_file (
         .CLK(clk),
-        .areset(reset), // active-low reset
-        .WE3(RegWrite),
+        .areset(reset),
+        .WE3(register_write),
         .A1(Instr[19:15]),
         .A2(Instr[24:20]),
         .A3(Instr[11:7]),
@@ -57,14 +61,12 @@ module TopModule (
         .RD2(RD2)
     );
 
-    // Sign Extension
     SignExtender sign_extender (
         .Instr(Instr),
         .ImmSrc(ImmSrc),
         .ImmExt(ImmExt)
     );
 
-    // ALU Source MUX
     Mux2x1 alu_mux (
         .In1(RD2),
         .In2(ImmExt),
@@ -72,7 +74,6 @@ module TopModule (
         .out(SrcB)
     );
 
-    // ALU
     ALU alu (
         .SrcA(SrcA),
         .SrcB(SrcB),
@@ -82,16 +83,14 @@ module TopModule (
         .signflag(signflag)
     );
 
-    // Data Memory
     data_mem data_memory (
         .CLK(clk),
-        .WE(MemWrite),
+        .WE(memory_write),
         .A(ALUResult),
         .WD(RD2),
         .RD(ReadData)
     );
 
-    // Result MUX (ALU or Memory)
     Mux2x1 result_mux (
         .In1(ALUResult),
         .In2(ReadData),
@@ -99,9 +98,8 @@ module TopModule (
         .out(Result)
     );
 
-    // PC Next Logic (PC + 4 or PC + ImmExt)
     PC_Next_logic pc_next_logic (
-        .PCsrc(PCSrc),
+        .PCsrc(take_branch),
         .PC(PC),
         .immExt(ImmExt),
         .PCNext(PCNext)
