@@ -4,11 +4,14 @@ module instruction_memory(
 );
     reg [31:0] instr_mem[0:63];
 
+    integer index;
     initial begin
-        $readmemh("program.txt", instr_mem); // Load machine code
+        for (index = 0; index < 64; index = index + 1)
+            instr_mem[index] = 32'b0;
+        $readmemh("programs/program.txt", instr_mem);
     end
 
     always @(*) begin
-        instr = instr_mem[PC[31:2]];
+        instr = (PC[31:8] == 0 && PC[1:0] == 0) ? instr_mem[PC[7:2]] : 32'b0;
     end
 endmodule
